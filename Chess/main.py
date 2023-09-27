@@ -1,6 +1,6 @@
 # from Chess import Chess
-from Chess_test import Chess
+from Chess import Chess
 
 if __name__ == '__main__':
-    chess = Chess("white")
+    chess = Chess("black")
     chess.run()
