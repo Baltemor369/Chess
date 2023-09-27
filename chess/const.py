@@ -1,8 +1,0 @@
-# color 
-WHITE = (255,255,255)
-GRAYLIGHT = (66,66,66)
-GREENLIGHT = ()
-# size var
-CASE_SIZE = 50
-SCREEN_H = 800
-SCREEN_W = 800
