@@ -46,6 +46,9 @@ class Pawn(Piece):
         if not board.get_piece_at((self.get_x(), self.get_y()+1*coef)):
             m = Move(self.get_position(),(self.get_x(), self.get_y()+1*coef), self)
             possible_moves.append(m)
+            if self.step == 0 and board.get_piece_at((self.get_x(), self.get_y()+2*coef)) is None:
+                m = Move(self.get_position(),(self.get_x(), self.get_y()+2*coef), self)
+                possible_moves.append(m)
 
         # left diagonal move
         p = board.get_piece_at((self.get_x()-1*coef, self.get_y()+1*coef))
