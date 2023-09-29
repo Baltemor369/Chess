@@ -132,6 +132,7 @@ class Chess:
                     
                     selection = self.get_piece_at((x,y))
                     
+                    has_move = False
                     #verify if Click on a possible move
                     if self.selected_piece:
                         
@@ -139,19 +140,25 @@ class Chess:
                         
                             if move.end == (x, y):
                                 self.move(move)
+                                has_move = True
                                 self.selected_piece = None
                                 self.possible_move = None
                                 self.turn = "black" if self.turn == "white" else "white"
                                 break
                     
-                    # verify if click on another of my pieces
-                    if selection and selection.color == self.turn:
-                            self.selected_piece = selection
-                            self.possible_move = self.selected_piece.get_possible_moves(self)
-                    
-                    if not selection:
-                        self.selected_piece = None
-                        self.possible_move = None
+                    if not has_move:    
+                        # verify if click on another of my pieces
+                        if selection :
+                            if selection.color == self.turn:
+                                self.selected_piece = selection
+                                self.possible_move = self.selected_piece.get_possible_moves(self)
+                        
+                            else:
+                                self.selected_piece = None
+                                self.possible_move = None
+                        else:
+                            self.selected_piece = None
+                            self.possible_move = None
                     
     def update_data(self):
         possible_moves = []
