@@ -7,3 +7,6 @@ class Move:
         # for castling
         self.second_target = second_target
         self.second_end:tuple[int,int] = second_end
+    
+    def __repr__(self) -> str:
+        return f"{self.target_piece} {self.start}->{self.end} || {self.eat_piece} || {self.second_end} || {self.second_target}"

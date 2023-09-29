@@ -32,8 +32,8 @@ class Chess:
         for x in range(8):
             row = []
             for y in range(8):
-                coord_x = self.start_x + y * CASE_SIZE + (CASE_SIZE - IMG_SIZE)/2
-                coord_y = self.start_y + x * CASE_SIZE + (CASE_SIZE - IMG_SIZE)/2
+                coord_x = y # self.start_x + y * CASE_SIZE + (CASE_SIZE - IMG_SIZE)/2
+                coord_y = x # self.start_y + x * CASE_SIZE + (CASE_SIZE - IMG_SIZE)/2
 
                 color = "white" if self.botside == "black" else "black"
                 piece3 = "queen" if self.botside == "white" else "king"
@@ -90,12 +90,12 @@ class Chess:
                         row.append(piece)
                     # knight
                     elif y == 1 or y == 6:
-                        piece = Piece(f"assets/{color}/knight.png", color, "knight", (coord_x,coord_y))
+                        piece = Knight(f"assets/{color}/knight.png", color, "knight", (coord_x,coord_y))
                         self.piece_list.append(piece)
                         row.append(piece)
                     # bishop
                     elif y == 2 or y == 5:
-                        piece = Piece(f"assets/{color}/bishop.png", color, "bishop", (coord_x,coord_y))
+                        piece = Bishop(f"assets/{color}/bishop.png", color, "bishop", (coord_x,coord_y))
                         self.piece_list.append(piece)
                         row.append(piece)
                     elif y == 3:
@@ -119,46 +119,72 @@ class Chess:
     
     def handle_event(self):
         for evt in pygame.event.get():
+            
             if evt.type == pygame.QUIT:
                 self.running = False
+            
             elif evt.type == pygame.MOUSEBUTTONDOWN:
+                
                 if evt.button == 1:
                     mouse_x, mouse_y = pygame.mouse.get_pos()
                     x = (mouse_x - self.start_x)//CASE_SIZE
                     y = (mouse_y -self.start_y)//CASE_SIZE
+                    
                     selection = self.get_piece_at((x,y))
-                    # click on nothing
-                    if selection is None:
-                        self.selected_piece = None
-                        continue
-                    # click on own piece
-                    if selection.color == self.turn:
-                        # click on a possible move
-                        for move in self.possible_move:
-                            if move.end == (x,y):
-                                self.move(move)
-                                break
-                        # click on a new piece
-                        if selection != self.selected_piece:
-                            self.selected_piece = selection
-                    # click on nothing or an ennemy piece
-                    else:
-                        self.selected_piece = None
-                    # print(self.selected_piece.name)
+                    
+                    #verify if Click on a possible move
+                    if self.selected_piece:
                         
+                        for move in self.possible_move:
+                        
+                            if move.end == (x, y):
+                                self.move(move)
+                                self.selected_piece = None
+                                self.possible_move = None
+                                self.turn = "black" if self.turn == "white" else "white"
+                                break
+                    
+                    # verify if click on another of my pieces
+                    if selection and selection.color == self.turn:
+                            self.selected_piece = selection
+                            self.possible_move = self.selected_piece.get_possible_moves(self)
+                    
+                    if not selection:
+                        self.selected_piece = None
+                        self.possible_move = None
                     
     def update_data(self):
+        possible_moves = []
         
-        # verifier si le roi est en échec
-            # si oui trier les mouvements possible
-        # verifier si selected_piece is pinned
-            # si oui trier les mouvements possible
-        # recuperer les deplacements absolus de selected_piece
-        # verifier qu'ils soient dans le plateau
-        # verifier qu'ils ne soient pas occupés par un pion de meme couleur
-        # verifier les déplacements relatifs (prise en passant - pion diagonale - castling - pion doublestep)
-        # set position_move_possible en fonction des points précédents
-        pass
+        if self.selected_piece:
+            # get the possible move of selected piece 
+            possible_moves = self.selected_piece.get_possible_moves(self)
+        
+
+            # verify is our king is in check
+            # tmp = self.is_in_check(self.turn)
+            
+            # if tmp != False:
+                # get all position between our king and the attacking piece
+                # cases_possible = set(self.get_squares_between(self.get_king(self.turn),tmp))
+                # add the position of the attacking piece
+                # cases_possible.add(tmp.get_position())
+                
+                # possible_moves = [move for move in possible_moves if move.end in cases_possible]
+                    
+            # verify if the selected piece is not pinned
+            # tmp = self.is_pinned(self.selected_piece)
+            
+            # if tmp != False:
+                # get all position between the pinning piece and our king
+                # cases_possible = set(self.get_squares_between(tmp, self.get_king(self.turn)))
+
+                # possible_moves = [move for move in possible_moves if move.end in cases_possible]
+
+            # verify is moves are in the board
+            # possible_moves = [move for move in possible_moves if 0 <= move.end[0] < 8 and 0 <= move.end[1] < 8]
+            
+        self.possible_move = possible_moves.copy()
 
     def run(self):
         while self.running:
@@ -170,24 +196,41 @@ class Chess:
             
             pygame.display.flip()
 
-            self.clock.tick(30)
+            self.clock.tick(25)
         
         pygame.quit()
 
     def draw_board(self):
-        self.screen.fill((255,255,255))
-        
+        self.screen.fill((255, 255, 255))
+
         for row in range(8):
-            for case in range(8):
-                bg_color = WHITE if (row+case)%2==0 else GRAYLIGHT
-                if self.selected_piece and (self.start_x + row * CASE_SIZE + (CASE_SIZE - IMG_SIZE)/2, self.start_y + case * CASE_SIZE + (CASE_SIZE - IMG_SIZE)/2) == self.selected_piece.get_position():
-                        pygame.draw.rect(self.screen, GREENLIGHT, (self.start_x + CASE_SIZE * row, self.start_y + CASE_SIZE * case, CASE_SIZE, CASE_SIZE))
+            for col in range(8):
+                bg_color = WHITE if (row + col) % 2 == 0 else GRAYLIGHT
+                case_rect = pygame.Rect(
+                    self.start_x + CASE_SIZE * row,
+                    self.start_y + CASE_SIZE * col,
+                    CASE_SIZE,
+                    CASE_SIZE,
+                )
+
+                if self.selected_piece:
+                    selected_pos = self.selected_piece.get_position()
+                    if (case_rect.x + (CASE_SIZE - IMG_SIZE) / 2, case_rect.y + (CASE_SIZE - IMG_SIZE) / 2) == selected_pos:
+                        pygame.draw.rect(self.screen, GREENLIGHT, case_rect)
+                    else:
+                        pygame.draw.rect(self.screen, bg_color, case_rect)
                 else:
-                    pygame.draw.rect(self.screen, bg_color, (self.start_x + CASE_SIZE * row, self.start_y + CASE_SIZE * case, CASE_SIZE, CASE_SIZE))
-                
-                elt = self.board[case][row]
-                if elt != None:
-                    self.screen.blit(elt.image, (elt.get_x(), elt.get_y()))
+                    pygame.draw.rect(self.screen, bg_color, case_rect)
+
+                elt = self.get_piece_at((row,col))
+                if isinstance(elt,Piece):
+                    x = self.start_x + CASE_SIZE * elt.get_x() + (CASE_SIZE - IMG_SIZE)/2
+                    y = self.start_y + CASE_SIZE * elt.get_y() + (CASE_SIZE - IMG_SIZE)/2
+                    self.screen.blit(elt.image, (x,y))
+
+                for move in self.possible_move:
+                    if move.end == (row,col):
+                        pygame.draw.rect(self.screen, BLUELIGHT, case_rect)
     
     def get_king(self, color:str) -> Piece|None:
         for elt in self.piece_list:
@@ -195,18 +238,10 @@ class Chess:
                 return elt
         return None
     
-    def get_black_piece(self):
+    def get_pieces(self, color:str) -> list[Piece]:
         pieces = []
         for elt in self.piece_list:
-            if elt.color == "black":
-                pieces.append(elt)
-            
-        return pieces
-    
-    def get_white_piece(self):
-        pieces = []
-        for elt in self.piece_list:
-            if elt.color == "white":
+            if elt.color == color:
                 pieces.append(elt)
             
         return pieces
@@ -220,8 +255,8 @@ class Chess:
         return (target_piece.get_x() == second_piece.get_x()) or (target_piece.get_y() == second_piece.get_y())
 
     def is_same_diagonal(self, target_piece:Piece, second_piece:Piece):
-        x1, y1 = target_piece.get_pos()
-        x2, y2 = second_piece.get_pos()
+        x1, y1 = target_piece.get_position()
+        x2, y2 = second_piece.get_position()
 
         return abs(x1-x2) == abs(y1 - y2)
     
@@ -231,8 +266,8 @@ class Chess:
     def get_squares_between(self, piece1:Piece, piece2:Piece) -> list[tuple[int,int]]:
         squares_between = []
     
-        x1, y1 = piece1.get_pos()
-        x2, y2 = piece2.get_pos()
+        x1, y1 = piece1.get_position()
+        x2, y2 = piece2.get_position()
         
         # Calculez les différences entre les coordonnées x et y
         dx = x2 - x1
@@ -251,27 +286,75 @@ class Chess:
         current_y = y1 + step_y
         
         # Parcourez les cases intermédiaires jusqu'à atteindre la case finale (non incluse)
-        while (current_x, current_y) != piece2.get_pos():
+        while (current_x, current_y) != piece2.get_position():
             squares_between.append((current_x, current_y))
             current_x += step_x
             current_y += step_y
         
         return squares_between
+
+    def get_pieces_between(self, piece1: Piece, piece2: Piece):
+        return [self.get_piece_at(pos) for pos in self.get_squares_between(piece1, piece2) if isinstance(self.get_piece_at(pos),Piece)]
+
     
     def set(self, pos:tuple[int,int], val:Piece|None):
         if 0 <= pos[0] < 8 and 0 <= pos[1] <8:
             self.board[pos[1]][pos[0]] = val
         
     def move(self, move:Move):
-        self.set(move.start, None)
+        # actualize the position in the piece class
+        move.target_piece.move(move.end)
+        self.set(move.start,None)
 
-        # eating
         if move.eat_piece:
             self.set(move.eat_piece.get_position(), None)
         
-        # castling
-        if move.second_target:
+        elif move.second_target:
             self.set(move.second_end, move.second_target)
-
-        # main move
+        
         self.set(move.end, move.target_piece)
+
+
+    def is_in_check(self, color:str) -> Piece|bool:
+        king = self.get_king(color)
+        king_position = king.get_position()
+
+        for p in self.get_pieces(king.get_opposite_color()):
+            if king_position in p.get_possible_moves(self):
+                return p
+
+        return False
+    
+    def is_pinned(self, piece: Piece) -> Piece | bool:
+        king = self.get_king(piece.color)
+
+        for p in self.get_pieces(piece.get_opposite_color()):
+            # pawn and king cannot pin
+            if p.name not in ["pawn", "king"]:
+                pass
+
+        return False
+    
+    def is_pinned(self, piece:Piece) -> Piece|bool:
+        king = self.get_king(piece.color)
+        buffer = 0
+        piece_pinning = None
+        is_surrounded = False
+        for p in self.get_pieces(piece.get_opposite_color()):
+            
+            if p.name not in ["pawn","king"]:
+                position_between = self.get_squares_between(p, king)
+            
+                for pos in position_between:
+            
+                    if isinstance(self.get_piece_at(pos),Piece):
+                        buffer += 1
+                    
+                    if self.get_piece_at(pos) == piece:
+                        is_surrounded = True
+                        piece_pinning = p
+
+        if buffer == 1 and is_surrounded:
+            return piece_pinning
+        
+        return False

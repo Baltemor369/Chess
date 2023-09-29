@@ -13,6 +13,9 @@ class Piece:
         
         # set the position of the image
         self.rect.x, self.rect.y = position[0], position[1]
+    
+    def __repr__(self) -> str:
+        return f"{self.name} {self.color} {self.get_position()}"
         
     def move(self,new_position:tuple[int,int]):
         self.rect.x, self.rect.y = new_position
@@ -27,6 +30,9 @@ class Piece:
     def get_opposite_color(self):
          return "black" if self.color == "white" else "white"
 
+    def get_possible_moves(self, board)->list[Move]:
+        raise NotImplementedError("Subclasses should implement this method")
+
 class Pawn(Piece):
     def __init__(self, path: str, color: str, type: str, position: tuple[int, int], direction:int) -> None:
         super().__init__(path, color, type, position)
@@ -35,30 +41,36 @@ class Pawn(Piece):
     
     def get_possible_moves(self, board):
         possible_moves = []
-        coef = self.move_direction # 1 if pawn has to go down, -1 if pawn has to go up
-        if not board.get_piece_at((self.get_x()+1*coef, self.get_y())):
-            m = Move(self.get_position(),(self.get_x()+1*coef, self.get_y()), self)
+        coef = self.move_direction * -1 # 1 if pawn has to go down, -1 if pawn has to go up
+        # front move
+        if not board.get_piece_at((self.get_x(), self.get_y()+1*coef)):
+            m = Move(self.get_position(),(self.get_x(), self.get_y()+1*coef), self)
             possible_moves.append(m)
 
+        # left diagonal move
+        p = board.get_piece_at((self.get_x()-1*coef, self.get_y()+1*coef))
+        if p and p.color != self.color:
+            m = Move(self.get_position(),(self.get_x()-1*coef, self.get_y()+1*coef), self, p)
+            possible_moves.append(m)
+
+        # right diagonal move
         p = board.get_piece_at((self.get_x()+1*coef, self.get_y()+1*coef))
         if p and p.color != self.color:
             m = Move(self.get_position(),(self.get_x()+1*coef, self.get_y()+1*coef), self, p)
             possible_moves.append(m)
 
-        p = board.get_piece_at((self.get_x()+1*coef, self.get_y()-1*coef))
-        if p and p.color != self.color:
-            m = Move(self.get_position(),(self.get_x()+1*coef, self.get_y()-1*coef), self, p)
-            possible_moves.append(m)
-
-        p = board.get_piece_at((self.get_x(), self.get_y()+1*coef))
+        # "en passant" left
+        p = board.get_piece_at((self.get_x()-1*coef, self.get_y()))
+        if p and p.name == "pawn" and p.color != self.color:
+            if p.get_x() - p.spawn_position[0] == 2 and p.step==1*coef:
+                m = Move(self.get_position(),(self.get_x()-1*coef, self.get_y()+1*coef), self, p)
+                possible_moves.append(m)
+        
+        # "en passant" right
+        p = board.get_piece_at((self.get_x()+1*coef, self.get_y()))
         if p and p.name == "pawn" and p.color != self.color:
             if p.get_x() - p.spawn_position[0] == 2 and p.step==1*coef:
                 m = Move(self.get_position(),(self.get_x()+1*coef, self.get_y()+1*coef), self, p)
-                possible_moves.append(m)
-        p = board.get_piece_at((self.get_x(), self.get_y()-1*coef))
-        if p and p.name == "pawn" and p.color != self.color:
-            if p.get_x() - p.spawn_position[0] == 2 and p.step==1*coef:
-                m = Move(self.get_position(),(self.get_x()+1*coef, self.get_y()-1*coef), self, p)
                 possible_moves.append(m)
         
         return possible_moves
@@ -135,9 +147,8 @@ class Knight(Piece):
         possible_moves = []
 
         cases = [(1, 2), (2, 1), (2, -1), (1, -2), (-1, -2), (-2, -1), (-2, 1), (-1, 2)]
-
         for x, y in cases:
-            p = board.get_piece_at((x, y))
+            p = board.get_piece_at((self.get_x()+x, self.get_y()+y))
             
             # find a piece
             if p:
@@ -145,10 +156,11 @@ class Knight(Piece):
                 if p.color != self.color:
                     m = Move(self.get_position(), p.get_position(), self, p)
                     possible_moves.append(m)
+                
                 continue
             # empty case
             else:
-                m = Move(self.get_position(), (x, y), self)
+                m = Move(self.get_position(), (self.get_x() + x, self.get_y() + y), self)
                 possible_moves.append(m)
             
         return possible_moves
@@ -158,7 +170,7 @@ class Queen(Piece):
         super().__init__(path, color, type, position)
 
     def get_possible_moves(self, board):
-        possibles_moves = []
+        possible_moves = []
 
         directions = [(1, 0), (-1, 0), (0, 1), (0, -1),(1, 1), (-1, 1), (1, -1), (-1, -1)]
 
@@ -173,7 +185,7 @@ class Queen(Piece):
                     # ennemy piece
                     if p.color != self.color:
                         m = Move(self.get_position(), p.get_position(), self, p)
-                        possibles_moves.append(m)
+                        possible_moves.append(m)
                     # find a ally piece just stop the loop
                     # finally
                     break
@@ -181,14 +193,16 @@ class Queen(Piece):
                 # empty case
                 else:
                     m = Move(self.get_position(), (x, y), self)
-                    possibles_moves.append(m)
+                    possible_moves.append(m)
+
+        return possible_moves
 
 class King(Piece):
     def __init__(self, path: str, color: str, type: str, position: tuple[int, int]) -> None:
         super().__init__(path, color, type, position)
 
     def get_possible_moves(self, board):
-        possibles_moves = []
+        possible_moves = []
 
         directions = [(1, 0), (-1, 0), (0, 1), (0, -1),(1, 1), (-1, 1), (1, -1), (-1, -1)]
 
@@ -201,7 +215,7 @@ class King(Piece):
                 # ennemy piece
                 if p.color != self.color:
                     m = Move(self.get_position(), p.get_position(), self, p)
-                    possibles_moves.append(m)
+                    possible_moves.append(m)
                 # find a ally piece just stop the loop
                 # finally
                 break
@@ -209,4 +223,17 @@ class King(Piece):
             # empty case
             else:
                 m = Move(self.get_position(), (x, y), self)
-                possibles_moves.append(m)
+                possible_moves.append(m)
+        
+        # castling check
+        pieces = board.get_pieces(self.color)
+        for piece in pieces:
+            
+            if piece.name == "rook" and piece.step == 0:
+            
+                if len(board.get_pieces_between(self, piece)) == 0:
+                    sens = 1 if self.get_y()-piece.get_y() < 0 else -1
+                    m = Move(self.get_position(), (self.get_x(), self.get_y() + 2 * sens), self, second_target=piece, second_end=(piece.get_x(),self.get_y() - 1 * sens))
+                    possible_moves.append(m)
+
+        return possible_moves
