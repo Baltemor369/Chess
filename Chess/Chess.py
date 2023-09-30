@@ -131,16 +131,16 @@ class Chess:
                     y = (mouse_y -self.start_y)//CASE_SIZE
                     
                     selection = self.get_piece_at((x,y))
-                    
                     has_move = False
+
                     #verify if Click on a possible move
                     if self.selected_piece:
                         
                         for move in self.possible_move:
-                        
                             if move.end == (x, y):
                                 self.move(move)
                                 has_move = True
+                                # clear selection
                                 self.selected_piece = None
                                 self.possible_move = None
                                 self.turn = "black" if self.turn == "white" else "white"
@@ -188,8 +188,12 @@ class Chess:
 
                 # possible_moves = [move for move in possible_moves if move.end in cases_possible]
 
-            # verify is moves are in the board
-            # possible_moves = [move for move in possible_moves if 0 <= move.end[0] < 8 and 0 <= move.end[1] < 8]
+            new = []
+            # verify if moves are in the board
+            for move in possible_moves:
+                if  0 <= move.end[0] < 8 and 0 <= move.end[1] < 8:
+                    new.append(move)
+            possible_moves = new
             
         self.possible_move = possible_moves.copy()
 
@@ -209,7 +213,7 @@ class Chess:
 
     def draw_board(self):
         self.screen.fill((255, 255, 255))
-
+        moves = [move.end for move in self.possible_move]
         for row in range(8):
             for col in range(8):
                 bg_color = WHITE if (row + col) % 2 == 0 else GRAYLIGHT
@@ -220,26 +224,25 @@ class Chess:
                     CASE_SIZE,
                 )
 
-                if self.selected_piece:
-                    selected_pos = self.selected_piece.get_position()
-                    if (row,col) == selected_pos:
-                        pygame.draw.rect(self.screen, GREENLIGHT, case_rect)
-                    else:
-                        pygame.draw.rect(self.screen, bg_color, case_rect)
+                # highlight the selected piece
+                if self.selected_piece and (row,col) == self.selected_piece.get_position():
+                    pygame.draw.rect(self.screen, GREENLIGHT, case_rect)
+                # classic draw
                 else:
                     pygame.draw.rect(self.screen, bg_color, case_rect)
 
-                for move in self.possible_move:
-                    if move.end == (row,col):
-                        pygame.draw.rect(self.screen, BLUELIGHT, case_rect)
+                # highlight possible moves
+                if (row,col) in moves:
+                    pygame.draw.rect(self.screen, BLUELIGHT, case_rect)
                 
-                print(self.is_in_check(self.turn))
+                # highlight the king who is in check
                 if self.is_in_check(self.turn):
                     king = self.get_king(self.turn)
                     x = self.start_x + CASE_SIZE * king.get_x() + (CASE_SIZE - IMG_SIZE)/2
                     y = self.start_y + CASE_SIZE * king.get_y() + (CASE_SIZE - IMG_SIZE)/2
                     pygame.draw.rect(self.screen, REDLIGHT, case_rect)
                 
+                # put the piece image on the Surface
                 elt = self.get_piece_at((row,col))
                 if isinstance(elt,Piece):
                     x = self.start_x + CASE_SIZE * elt.get_x() + (CASE_SIZE - IMG_SIZE)/2
@@ -321,9 +324,11 @@ class Chess:
         self.set(move.start,None)
 
         if move.eat_piece:
+            move.eat_piece.set_position((-1,-1))
             self.set(move.eat_piece.get_position(), None)
         
         elif move.second_target:
+            move.second_target.move(move.second_end)
             self.set(move.second_end, move.second_target)
         
         self.set(move.end, move.target_piece)

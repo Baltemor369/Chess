@@ -18,8 +18,11 @@ class Piece:
         return f"{self.name} {self.color} {self.get_position()}"
         
     def move(self,new_position:tuple[int,int]):
-        self.rect.x, self.rect.y = new_position
+        self.set_position(new_position)
         self.step += 1
+    
+    def set_position(self,position:tuple[int,int]):
+        self.rect.x, self.rect.y = position
     
     def get_position(self):
         return (self.rect.x, self.rect.y)
@@ -213,30 +216,24 @@ class King(Piece):
             x, y = self.get_x() + dx , self.get_y() + dy
             p = board.get_piece_at((x, y))
             
-            #  find a piece
-            if p:
-                # ennemy piece
-                if p.color != self.color:
-                    m = Move(self.get_position(), p.get_position(), self, p)
-                    possible_moves.append(m)
-                # find a ally piece just stop the loop
-                # finally
-                break
-            
             # empty case
-            else:
+            if p is None:
                 m = Move(self.get_position(), (x, y), self)
                 possible_moves.append(m)
+            elif p.color != self.color:
+                m = Move(self.get_position(), (x, y), self, p)
+                possible_moves.append(m)
         
-        # castling check
-        pieces = board.get_pieces(self.color)
-        for piece in pieces:
-            
-            if piece.name == "rook" and piece.step == 0:
-            
-                if len(board.get_pieces_between(self, piece)) == 0:
-                    sens = 1 if self.get_y()-piece.get_y() < 0 else -1
-                    m = Move(self.get_position(), (self.get_x(), self.get_y() + 2 * sens), self, second_target=piece, second_end=(piece.get_x(),self.get_y() - 1 * sens))
+        # castling
+        if self.step == 0:
+            rook1 = board.get_piece_at((0,self.get_y()))
+            rook2 = board.get_piece_at((7,self.get_y()))
+            if rook1 and rook1.step == 0:
+                if len(board.get_pieces_between(self,rook1))==0:
+                    m = Move(self.get_position(), (self.get_x()-2, self.get_y()), self, None, rook1, (self.get_x()-1, self.get_y()))
                     possible_moves.append(m)
-
+            if rook2 and rook2.step == 0:
+                if len(board.get_pieces_between(self,rook2))==0:
+                    m = Move(self.get_position(), (self.get_x()+2, self.get_y()), self, None, rook2, (self.get_x()+1, self.get_y()))
+                    possible_moves.append(m)
         return possible_moves
