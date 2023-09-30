@@ -222,22 +222,29 @@ class Chess:
 
                 if self.selected_piece:
                     selected_pos = self.selected_piece.get_position()
-                    if (case_rect.x + (CASE_SIZE - IMG_SIZE) / 2, case_rect.y + (CASE_SIZE - IMG_SIZE) / 2) == selected_pos:
+                    if (row,col) == selected_pos:
                         pygame.draw.rect(self.screen, GREENLIGHT, case_rect)
                     else:
                         pygame.draw.rect(self.screen, bg_color, case_rect)
                 else:
                     pygame.draw.rect(self.screen, bg_color, case_rect)
 
+                for move in self.possible_move:
+                    if move.end == (row,col):
+                        pygame.draw.rect(self.screen, BLUELIGHT, case_rect)
+                
+                print(self.is_in_check(self.turn))
+                if self.is_in_check(self.turn):
+                    king = self.get_king(self.turn)
+                    x = self.start_x + CASE_SIZE * king.get_x() + (CASE_SIZE - IMG_SIZE)/2
+                    y = self.start_y + CASE_SIZE * king.get_y() + (CASE_SIZE - IMG_SIZE)/2
+                    pygame.draw.rect(self.screen, REDLIGHT, case_rect)
+                
                 elt = self.get_piece_at((row,col))
                 if isinstance(elt,Piece):
                     x = self.start_x + CASE_SIZE * elt.get_x() + (CASE_SIZE - IMG_SIZE)/2
                     y = self.start_y + CASE_SIZE * elt.get_y() + (CASE_SIZE - IMG_SIZE)/2
                     self.screen.blit(elt.image, (x,y))
-
-                for move in self.possible_move:
-                    if move.end == (row,col):
-                        pygame.draw.rect(self.screen, BLUELIGHT, case_rect)
     
     def get_king(self, color:str) -> Piece|None:
         for elt in self.piece_list:
@@ -329,16 +336,6 @@ class Chess:
         for p in self.get_pieces(king.get_opposite_color()):
             if king_position in p.get_possible_moves(self):
                 return p
-
-        return False
-    
-    def is_pinned(self, piece: Piece) -> Piece | bool:
-        king = self.get_king(piece.color)
-
-        for p in self.get_pieces(piece.get_opposite_color()):
-            # pawn and king cannot pin
-            if p.name not in ["pawn", "king"]:
-                pass
 
         return False
     
