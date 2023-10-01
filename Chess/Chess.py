@@ -20,6 +20,7 @@ class Chess:
         self.possible_move:list[Move] = []
         self.special_case:dict = {}
         self.turn = "white"
+        self.log_move = []
 
         self.start_x = (SCREEN_W - (CASE_SIZE * 8)) // 2
         self.start_y = (SCREEN_H - (CASE_SIZE * 8)) // 2
@@ -123,6 +124,8 @@ class Chess:
             if evt.type == pygame.QUIT:
                 self.running = False
             
+            # elif evt.type == pygame.KEYDOWN:
+            
             elif evt.type == pygame.MOUSEBUTTONDOWN:
                 
                 if evt.button == 1:
@@ -139,6 +142,7 @@ class Chess:
                         for move in self.possible_move:
                             if move.end == (x, y):
                                 self.move(move)
+                                self.log_move.append(move)
                                 has_move = True
                                 # clear selection
                                 self.selected_piece = None
@@ -166,35 +170,19 @@ class Chess:
         if self.selected_piece:
             # get the possible move of selected piece 
             possible_moves = self.selected_piece.get_possible_moves(self)
-        
-
-            # verify is our king is in check
-            # tmp = self.is_in_check(self.turn)
-            
-            # if tmp != False:
-                # get all position between our king and the attacking piece
-                # cases_possible = set(self.get_squares_between(self.get_king(self.turn),tmp))
-                # add the position of the attacking piece
-                # cases_possible.add(tmp.get_position())
-                
-                # possible_moves = [move for move in possible_moves if move.end in cases_possible]
-                    
-            # verify if the selected piece is not pinned
-            # tmp = self.is_pinned(self.selected_piece)
-            
-            # if tmp != False:
-                # get all position between the pinning piece and our king
-                # cases_possible = set(self.get_squares_between(tmp, self.get_king(self.turn)))
-
-                # possible_moves = [move for move in possible_moves if move.end in cases_possible]
-
+            # remove all move out of the board
             new = []
-            # verify if moves are in the board
             for move in possible_moves:
+                # if move is in the board limit
                 if  0 <= move.end[0] < 8 and 0 <= move.end[1] < 8:
-                    new.append(move)
+                    self.move(move)
+                    # if the move doesn't get the player in check
+                    if self.is_in_check(self.turn) == False:
+                        new.append(move)
+                    self.unmove(move)
+
             possible_moves = new
-            
+
         self.possible_move = possible_moves.copy()
 
     def run(self):
@@ -227,21 +215,16 @@ class Chess:
                 # highlight the selected piece
                 if self.selected_piece and (row,col) == self.selected_piece.get_position():
                     pygame.draw.rect(self.screen, GREENLIGHT, case_rect)
+                # highlight possible moves
+                elif (row,col) in moves:
+                    pygame.draw.rect(self.screen, BLUELIGHT, case_rect)
+                # highlight the king who is in check
+                elif self.is_in_check(self.turn) and self.get_piece_at((row,col)) == self.get_king(self.turn):
+                    pygame.draw.rect(self.screen, REDLIGHT, case_rect)
                 # classic draw
                 else:
                     pygame.draw.rect(self.screen, bg_color, case_rect)
 
-                # highlight possible moves
-                if (row,col) in moves:
-                    pygame.draw.rect(self.screen, BLUELIGHT, case_rect)
-                
-                # highlight the king who is in check
-                if self.is_in_check(self.turn):
-                    king = self.get_king(self.turn)
-                    x = self.start_x + CASE_SIZE * king.get_x() + (CASE_SIZE - IMG_SIZE)/2
-                    y = self.start_y + CASE_SIZE * king.get_y() + (CASE_SIZE - IMG_SIZE)/2
-                    pygame.draw.rect(self.screen, REDLIGHT, case_rect)
-                
                 # put the piece image on the Surface
                 elt = self.get_piece_at((row,col))
                 if isinstance(elt,Piece):
@@ -262,6 +245,9 @@ class Chess:
                 pieces.append(elt)
             
         return pieces
+    
+    def get_opposite_color(self):
+        return "white" if self.turn == "black" else "black"
     
     def get_piece_at(self,pos:tuple[int,int]):
         if 0 <= pos[0] < 8 and 0 <= pos[1] < 8:
@@ -322,24 +308,23 @@ class Chess:
         # actualize the position in the piece class
         move.target_piece.move(move.end)
         self.set(move.start,None)
+        self.set(move.end, move.target_piece)
 
         if move.eat_piece:
-            move.eat_piece.set_position((-1,-1))
             self.set(move.eat_piece.get_position(), None)
         
         elif move.second_target:
             move.second_target.move(move.second_end)
+            self.set(move.second_start, None)
             self.set(move.second_end, move.second_target)
         
-        self.set(move.end, move.target_piece)
-
-
     def is_in_check(self, color:str) -> Piece|bool:
         king = self.get_king(color)
         king_position = king.get_position()
 
         for p in self.get_pieces(king.get_opposite_color()):
-            if king_position in p.get_possible_moves(self):
+            moves = [move.end for move in p.get_possible_moves(self)]
+            if king_position in moves:
                 return p
 
         return False
@@ -367,3 +352,21 @@ class Chess:
             return piece_pinning
         
         return False
+
+    def unmove(self, move:Move):
+        # get back the main piece
+        move.target_piece.set_position(move.start)
+        move.target_piece.step -= 1
+        self.set(move.end,None)
+        self.set(move.start,move.target_piece)
+
+        # get back the eating piece if there is one
+        if move.eat_piece:
+            self.set(move.eat_piece.get_position(), move.eat_piece)
+        
+        # go back the second target if there is one
+        elif move.second_target:
+            move.second_target.set_position(move.second_start)
+            move.second_target.step -= 1
+            self.set(move.second_end, None)
+            self.set(move.second_start, move.second_target)
