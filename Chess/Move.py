@@ -6,6 +6,7 @@ class Move:
         self.eat_piece = eat_piece
         # for castling
         self.second_target = second_target
+        self.second_start:tuple[int,int] = second_target.get_position() if second_target else None
         self.second_end:tuple[int,int] = second_end
     
     def __repr__(self) -> str:
