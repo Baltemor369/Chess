@@ -1,4 +1,5 @@
 import pygame
+import pygame.freetype
 from const import *
 from Piece import *
 from Move import Move
@@ -6,28 +7,30 @@ from Move import Move
 class Chess:
     def __init__(self,botside:str="white") -> None:
         pygame.init()
+        pygame.font.init()
         
         self.screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
         pygame.display.set_caption("Chess")
 
         self.clock = pygame.time.Clock()
-
-        self.running:bool = True
-        self.board:list[list[Piece|None]] = []
-        self.piece_list:list[Piece] = []
-        self.botside:str = botside if botside=="white" else "black"
-        self.selected_piece:Piece|None = None
-        self.possible_move:list[Move] = []
-        self.special_case:dict = {}
-        self.turn = "white"
-        self.log_move = []
+        self.botside = botside
+        self.app_running:bool = True
 
         self.start_x = (SCREEN_W - (CASE_SIZE * 8)) // 2
         self.start_y = (SCREEN_H - (CASE_SIZE * 8)) // 2
-        
-        self.init_pieces()
-        
 
+    def init_var(self, botside:str):
+        self.game_running:bool = True
+        self.botside:str = botside if botside=="white" else "black"
+        self.turn:str = "white"
+        self.checkmate:str = None
+        self.selected_piece:Piece|None = None
+
+        self.board:list[list[Piece|None]] = []
+        self.piece_list:list[Piece] = []
+        self.possible_move:list[Move] = []
+        self.log_move:list[Move] = []       
+        
     def init_pieces(self):
 
         for x in range(8):
@@ -122,7 +125,7 @@ class Chess:
         for evt in pygame.event.get():
             
             if evt.type == pygame.QUIT:
-                self.running = False
+                self.game_running = False
             
             # elif evt.type == pygame.KEYDOWN:
             
@@ -146,7 +149,7 @@ class Chess:
                                 has_move = True
                                 # clear selection
                                 self.selected_piece = None
-                                self.possible_move = None
+                                self.possible_move = []
                                 self.turn = "black" if self.turn == "white" else "white"
                                 break
                     
@@ -159,43 +162,47 @@ class Chess:
                         
                             else:
                                 self.selected_piece = None
-                                self.possible_move = None
+                                self.possible_move = []
                         else:
                             self.selected_piece = None
-                            self.possible_move = None
+                            self.possible_move = []
                     
     def update_data(self):
-        possible_moves = []
-        
+        # verify checkmate
+        if self.is_in_check(self.turn) != False:
+            checkmate = True
+            # verify if a piece can move
+            for piece in self.get_pieces(self.turn):
+                if len(self.filter_move(piece))>0:
+                    checkmate = False
+                    break
+            if checkmate:
+                self.checkmate = "white" if self.turn == "black" else "black"
+                self.game_running = False
+
         if self.selected_piece:
-            # get the possible move of selected piece 
-            possible_moves = self.selected_piece.get_possible_moves(self)
-            # remove all move out of the board
-            new = []
-            for move in possible_moves:
-                # if move is in the board limit
-                if  0 <= move.end[0] < 8 and 0 <= move.end[1] < 8:
-                    self.move(move)
-                    # if the move doesn't get the player in check
-                    if self.is_in_check(self.turn) == False:
-                        new.append(move)
-                    self.unmove(move)
+            self.possible_move = self.filter_move(self.selected_piece)
 
-            possible_moves = new
-
-        self.possible_move = possible_moves.copy()
+        
 
     def run(self):
-        while self.running:
-            self.handle_event()
+        while self.app_running:
 
-            self.update_data()
-            
-            self.draw_board()
-            
-            pygame.display.flip()
+            self.init_var(self.botside)
+            self.init_pieces()
 
-            self.clock.tick(25)
+            while self.game_running:
+                self.handle_event()
+
+                self.update_data()
+                
+                self.draw_board()
+                
+                pygame.display.flip()
+
+                self.clock.tick(25)
+        
+            self.app_running = False
         
         pygame.quit()
 
@@ -232,6 +239,13 @@ class Chess:
                     y = self.start_y + CASE_SIZE * elt.get_y() + (CASE_SIZE - IMG_SIZE)/2
                     self.screen.blit(elt.image, (x,y))
     
+    def message(self, surface:pygame.Surface,text:str, position:tuple[int,int], fg:tuple[int,int,int], bg:tuple[int,int,int], font:int):
+        font = pygame.freetype.Font(None, 32)
+
+        text_surface= font.render(text, False, fg, bg)
+        surface.blit(text_surface, position)
+
+
     def get_king(self, color:str) -> Piece|None:
         for elt in self.piece_list:
             if elt.name == "king" and elt.color == color:
@@ -310,10 +324,10 @@ class Chess:
         self.set(move.start,None)
         self.set(move.end, move.target_piece)
 
-        if move.eat_piece:
-            self.set(move.eat_piece.get_position(), None)
+        # if move.eat_piece:
+        #     self.set(move.eat_piece.get_position(), None)
         
-        elif move.second_target:
+        if move.second_target:
             move.second_target.move(move.second_end)
             self.set(move.second_start, None)
             self.set(move.second_end, move.second_target)
@@ -370,3 +384,20 @@ class Chess:
             move.second_target.step -= 1
             self.set(move.second_end, None)
             self.set(move.second_start, move.second_target)
+    
+    def filter_move(self, piece:Piece):
+        # get the possible move of selected piece 
+        possible_moves = piece.get_possible_moves(self)
+        # remove all move out of the board
+        new = []
+        for move in possible_moves:
+            # if move is in the board limit
+            if  0 <= move.end[0] < 8 and 0 <= move.end[1] < 8:
+                self.move(move)
+                # if the move doesn't get the player in check
+                if self.is_in_check(self.turn) == False:
+                    new.append(move)
+                self.unmove(move)
+
+        possible_moves = new
+        return possible_moves
