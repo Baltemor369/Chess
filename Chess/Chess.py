@@ -15,16 +15,17 @@ class Chess:
         self.clock = pygame.time.Clock()
         self.botside = botside
         self.app_running:bool = True
-        self.game_running = False
 
         self.start_x = (SCREEN_W - (CASE_SIZE * 8)) // 2
         self.start_y = (SCREEN_H - (CASE_SIZE * 8)) // 2
 
     def init_var(self, botside:str):
-        self.botside:str = botside if botside=="white" else "black"
+        self.game_running = True
+        self.botside:str = "white" if botside=="white" else "black"
         self.turn:str = "white"
         self.checkmate:str = None
         self.selected_piece:Piece|None = None
+        self.end_message:str = ""
 
         self.board:list[list[Piece|None]] = []
         self.piece_list:list[Piece] = []
@@ -130,8 +131,14 @@ class Chess:
             elif evt.type == pygame.KEYDOWN:
                 if evt.key == pygame.K_ESCAPE:
                         self.game_running = False
+                elif evt.key == pygame.K_RETURN:
+                        if self.checkmate:
+                            self.init_var(self.botside)
+                            self.init_pieces()
+                elif evt.key == pygame.K_SPACE:
+                    self.unmove(self.log_move[-1])
             
-            elif evt.type == pygame.MOUSEBUTTONDOWN:
+            elif not self.checkmate and evt.type == pygame.MOUSEBUTTONDOWN:
                 
                 if evt.button == 1:
                     mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -170,19 +177,12 @@ class Chess:
                             self.possible_move = []
                     
     def update_data(self):
+        
         # verify checkmate
-        if self.is_in_check(self.turn) != False:
-            checkmate = True
-            # verify if a piece can move
-            for piece in self.get_pieces(self.turn):
-                if len(self.filter_move(piece))>0:
-                    checkmate = False
-                    break
-            if checkmate:
-                self.checkmate = "white" if self.turn == "black" else "black"
-                self.game_running = False
+        if self.is_in_checkmate(self.turn):
+            self.checkmate = "white" if self.turn == "black" else "black"
 
-        if self.selected_piece:
+        elif self.selected_piece:
             self.possible_move = self.filter_move(self.selected_piece)
 
         
@@ -196,7 +196,7 @@ class Chess:
                     self.app_running = False
                 elif e.type == pygame.KEYDOWN:
                     if e.key == pygame.K_RETURN:
-                        self.game_running = True
+                        self.game()
                     elif e.key == pygame.K_ESCAPE:
                         self.app_running = False
 
@@ -204,31 +204,30 @@ class Chess:
             self.screen.fill(WHITE)
 
             font = pygame.font.SysFont('timesnewroman', 32)
-            text = font.render("Press <Return> to start a game", True, (0,0,0), (255,255,255))
+            text = font.render("Press <Return> to start a game", True, BLACK, WHITE)
             w,h = text.get_size()
 
             x,y = (SCREEN_W - w)//2, (SCREEN_H - h)//2
             self.screen.blit(text,(x,y))
 
             pygame.display.flip()
-            
-            if self.game_running:
-            
-                self.init_var(self.botside)
-                self.init_pieces()
-
-                while self.game_running:
-                    self.handle_event()
-
-                    self.update_data()
-                    
-                    self.draw_board()
-                    
-                    pygame.display.flip()
-
-                    self.clock.tick(25)
         
         pygame.quit()
+    
+    def game(self):
+        self.init_var(self.botside)
+        self.init_pieces()
+
+        while self.game_running:
+            self.handle_event()
+
+            self.update_data()
+            
+            self.draw_board()
+            
+            pygame.display.flip()
+
+            self.clock.tick(25)
 
     def draw_board(self):
         self.screen.fill(WHITE)
@@ -262,6 +261,17 @@ class Chess:
                     x = self.start_x + CASE_SIZE * elt.get_x() + (CASE_SIZE - IMG_SIZE)/2
                     y = self.start_y + CASE_SIZE * elt.get_y() + (CASE_SIZE - IMG_SIZE)/2
                     self.screen.blit(elt.image, (x,y))
+        
+        if self.checkmate:
+            font = pygame.font.SysFont("Arial", 20)
+            text1 = font.render(f"{self.checkmate} Player won !", True, BLACK, WHITE)
+            text2 = font.render("Press <Return> to start a new game", True, BLACK, WHITE)
+            w1 = text1.get_width()
+            w2 = text2.get_width()
+            x1,y1 = (SCREEN_W - w1)//2, 25
+            x2,y2 = (SCREEN_W - w2)//2, 50
+            self.screen.blit(text1, (x1,y1))
+            self.screen.blit(text2, (x2,y2))
 
     def get_king(self, color:str) -> Piece|None:
         for elt in self.piece_list:
@@ -277,25 +287,10 @@ class Chess:
             
         return pieces
     
-    def get_opposite_color(self):
-        return "white" if self.turn == "black" else "black"
-    
     def get_piece_at(self,pos:tuple[int,int]):
         if 0 <= pos[0] < 8 and 0 <= pos[1] < 8:
             return self.board[pos[1]][pos[0]]
         return None
-
-    def is_same_line(self, target_piece:Piece, second_piece:Piece):
-        return (target_piece.get_x() == second_piece.get_x()) or (target_piece.get_y() == second_piece.get_y())
-
-    def is_same_diagonal(self, target_piece:Piece, second_piece:Piece):
-        x1, y1 = target_piece.get_position()
-        x2, y2 = second_piece.get_position()
-
-        return abs(x1-x2) == abs(y1 - y2)
-    
-    def is_align(self, target_piece:Piece, second_piece:Piece):
-        return self.is_same_line(target_piece, second_piece) or self.is_same_diagonal(target_piece, second_piece)
     
     def get_squares_between(self, piece1:Piece, piece2:Piece) -> list[tuple[int,int]]:
         squares_between = []
@@ -335,24 +330,12 @@ class Chess:
         if 0 <= pos[0] < 8 and 0 <= pos[1] <8:
             self.board[pos[1]][pos[0]] = val
         
-    def move(self, move:Move):
-        # actualize the position in the piece class
-        move.target_piece.move(move.end)
-        self.set(move.start,None)
-        self.set(move.end, move.target_piece)
-
-        # if move.eat_piece:
-        #     self.set(move.eat_piece.get_position(), None)
-        
-        if move.second_target:
-            move.second_target.move(move.second_end)
-            self.set(move.second_start, None)
-            self.set(move.second_end, move.second_target)
         
     def is_in_check(self, color:str) -> Piece|bool:
         king = self.get_king(color)
         king_position = king.get_position()
 
+        # go to check all ennemy pieces moves
         for p in self.get_pieces(king.get_opposite_color()):
             moves = [move.end for move in p.get_possible_moves(self)]
             if king_position in moves:
@@ -360,39 +343,51 @@ class Chess:
 
         return False
     
-    def is_pinned(self, piece:Piece) -> Piece|bool:
-        king = self.get_king(piece.color)
-        buffer = 0
-        piece_pinning = None
-        is_surrounded = False
-        for p in self.get_pieces(piece.get_opposite_color()):
-            
-            if p.name not in ["pawn","king"]:
-                position_between = self.get_squares_between(p, king)
-            
-                for pos in position_between:
-            
-                    if isinstance(self.get_piece_at(pos),Piece):
-                        buffer += 1
-                    
-                    if self.get_piece_at(pos) == piece:
-                        is_surrounded = True
-                        piece_pinning = p
+    def is_in_checkmate(self, color:str):
 
-        if buffer == 1 and is_surrounded:
-            return piece_pinning
+        if self.is_in_check(color) != False:
         
+            # verify if a ally piece can move
+            for piece in self.get_pieces(color):
+        
+                if len(self.filter_move(piece))>0:                
+                    return False
+
+            # if no one can move so checkmate
+            return True
+
         return False
+    
+    def move(self, move:Move):
+        # actualize the position in the piece class
+        move.target_piece.move(move.end)
+        self.set(move.start,None)
+        self.set(move.end, move.target_piece)
+
+        if move.eat_piece:
+            try:
+                self.piece_list.remove(move.eat_piece)
+            except:
+                pass
+        
+        if move.second_target:
+            move.second_target.move(move.second_end)
+            self.set(move.second_start, None)
+            self.set(move.second_end, move.second_target)
 
     def unmove(self, move:Move):
         # get back the main piece
+        # refresh the position for the piece
         move.target_piece.set_position(move.start)
         move.target_piece.step -= 1
+        # clear the end position
         self.set(move.end,None)
+        # refresh the begin position of the piece
         self.set(move.start,move.target_piece)
 
         # get back the eating piece if there is one
         if move.eat_piece:
+            self.piece_list.append(move.eat_piece)
             self.set(move.eat_piece.get_position(), move.eat_piece)
         
         # go back the second target if there is one
@@ -403,18 +398,27 @@ class Chess:
             self.set(move.second_start, move.second_target)
     
     def filter_move(self, piece:Piece):
+        # remove all move out of the board
+        # and illegal move that get your own king in check
+
         # get the possible move of selected piece 
         possible_moves = piece.get_possible_moves(self)
-        # remove all move out of the board
-        new = []
+        
+        legal_moves = []
         for move in possible_moves:
-            # if move is in the board limit
+            # if move in the board
             if  0 <= move.end[0] < 8 and 0 <= move.end[1] < 8:
+                # do the move
                 self.move(move)
+
                 # if the move doesn't get the player in check
                 if self.is_in_check(self.turn) == False:
-                    new.append(move)
+
+                    # it's a legal move so add it
+                    legal_moves.append(move)
+
+                # undo the move
                 self.unmove(move)
 
-        possible_moves = new
+        possible_moves = legal_moves
         return possible_moves
