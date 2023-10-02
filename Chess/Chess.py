@@ -15,12 +15,12 @@ class Chess:
         self.clock = pygame.time.Clock()
         self.botside = botside
         self.app_running:bool = True
+        self.game_running = False
 
         self.start_x = (SCREEN_W - (CASE_SIZE * 8)) // 2
         self.start_y = (SCREEN_H - (CASE_SIZE * 8)) // 2
 
     def init_var(self, botside:str):
-        self.game_running:bool = True
         self.botside:str = botside if botside=="white" else "black"
         self.turn:str = "white"
         self.checkmate:str = None
@@ -127,7 +127,9 @@ class Chess:
             if evt.type == pygame.QUIT:
                 self.game_running = False
             
-            # elif evt.type == pygame.KEYDOWN:
+            elif evt.type == pygame.KEYDOWN:
+                if evt.key == pygame.K_ESCAPE:
+                        self.game_running = False
             
             elif evt.type == pygame.MOUSEBUTTONDOWN:
                 
@@ -187,27 +189,49 @@ class Chess:
 
     def run(self):
         while self.app_running:
+            
+            # handle event
+            for e in pygame.event.get():
+                if e.type == pygame.QUIT:
+                    self.app_running = False
+                elif e.type == pygame.KEYDOWN:
+                    if e.key == pygame.K_RETURN:
+                        self.game_running = True
+                    elif e.key == pygame.K_ESCAPE:
+                        self.app_running = False
 
-            self.init_var(self.botside)
-            self.init_pieces()
+            # refresh_graphic
+            self.screen.fill(WHITE)
 
-            while self.game_running:
-                self.handle_event()
+            font = pygame.font.SysFont('timesnewroman', 32)
+            text = font.render("Press <Return> to start a game", True, (0,0,0), (255,255,255))
+            w,h = text.get_size()
 
-                self.update_data()
-                
-                self.draw_board()
-                
-                pygame.display.flip()
+            x,y = (SCREEN_W - w)//2, (SCREEN_H - h)//2
+            self.screen.blit(text,(x,y))
 
-                self.clock.tick(25)
-        
-            self.app_running = False
+            pygame.display.flip()
+            
+            if self.game_running:
+            
+                self.init_var(self.botside)
+                self.init_pieces()
+
+                while self.game_running:
+                    self.handle_event()
+
+                    self.update_data()
+                    
+                    self.draw_board()
+                    
+                    pygame.display.flip()
+
+                    self.clock.tick(25)
         
         pygame.quit()
 
     def draw_board(self):
-        self.screen.fill((255, 255, 255))
+        self.screen.fill(WHITE)
         moves = [move.end for move in self.possible_move]
         for row in range(8):
             for col in range(8):
@@ -238,13 +262,6 @@ class Chess:
                     x = self.start_x + CASE_SIZE * elt.get_x() + (CASE_SIZE - IMG_SIZE)/2
                     y = self.start_y + CASE_SIZE * elt.get_y() + (CASE_SIZE - IMG_SIZE)/2
                     self.screen.blit(elt.image, (x,y))
-    
-    def message(self, surface:pygame.Surface,text:str, position:tuple[int,int], fg:tuple[int,int,int], bg:tuple[int,int,int], font:int):
-        font = pygame.freetype.Font(None, 32)
-
-        text_surface= font.render(text, False, fg, bg)
-        surface.blit(text_surface, position)
-
 
     def get_king(self, color:str) -> Piece|None:
         for elt in self.piece_list:
