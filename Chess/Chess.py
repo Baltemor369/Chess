@@ -3,6 +3,7 @@ import pygame.freetype
 from const import *
 from Piece import *
 from Move import Move
+from function import move_to_chess
 
 class Chess:
     def __init__(self,botside:str="white") -> None:
@@ -137,6 +138,10 @@ class Chess:
                             self.init_pieces()
                 elif evt.key == pygame.K_SPACE:
                     self.unmove(self.log_move[-1])
+                    self.log_move.pop()
+                    self.turn = "black" if self.turn == "white" else "white"
+                    self.selected_piece = None
+                    self.possible_move = []
             
             elif not self.checkmate and evt.type == pygame.MOUSEBUTTONDOWN:
                 
@@ -231,6 +236,28 @@ class Chess:
 
     def draw_board(self):
         self.screen.fill(WHITE)
+        
+        font = pygame.font.SysFont("Arial", 20)
+
+        y_start = 200
+
+        log_start = (len(self.log_move)-MAX_LOG) if len(self.log_move) >MAX_LOG else 0
+        log_start = log_start - (log_start % 2)
+
+
+        move_text = ""
+        for i in range(log_start,len(self.log_move)):
+            if (i+1) % 2 == 0:
+                move_text += move_to_chess(self.log_move[i])
+                text = font.render(move_text, True, BLACK)
+                self.screen.blit(text, (650,y_start))
+                move_text = ""
+                y_start += 22
+            else:
+                move_text += move_to_chess(self.log_move[i]) + ' . '
+                text = font.render(move_text, True, BLACK)
+                self.screen.blit(text, (650,y_start))
+
         moves = [move.end for move in self.possible_move]
         for row in range(8):
             for col in range(8):
@@ -263,7 +290,6 @@ class Chess:
                     self.screen.blit(elt.image, (x,y))
         
         if self.checkmate:
-            font = pygame.font.SysFont("Arial", 20)
             text1 = font.render(f"{self.checkmate} Player won !", True, BLACK, WHITE)
             text2 = font.render("Press <Return> to start a new game", True, BLACK, WHITE)
             w1 = text1.get_width()
