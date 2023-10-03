@@ -26,6 +26,7 @@ class Chess:
 
     def init_var(self, botside:str):
         self.game_running = True
+        self.promotion = False
         self.botside:str = "white" if botside=="white" else "black"
         self.turn:str = "white"
         self.checkmate:str = None
@@ -183,7 +184,7 @@ class Chess:
                         if self.checkmate:
                             self.init_var(self.botside)
                             self.init_pieces()
-                elif evt.key == pygame.K_SPACE:
+                elif not self.promotion and evt.key == pygame.K_SPACE and len(self.log_move)>0:
                     self.unmove(self.log_move[-1])
                     self.log_move.pop()
                     self.turn = "black" if self.turn == "white" else "white"
@@ -197,48 +198,69 @@ class Chess:
                     x = (mouse_x - self.start_x)//CASE_SIZE
                     y = (mouse_y -self.start_y)//CASE_SIZE
                     
-                    selection = self.get_piece_at((x,y))
-                    has_move = False
+                    if not self.promotion :
+                        selection = self.get_piece_at((x,y))
+                        has_move = False
 
-                    #verify if Click on a possible move
-                    if self.selected_piece:
+                        #verify if Click on a possible move
+                        if self.selected_piece:
+                            
+                            for move in self.possible_move:
+                                if move.end == (x, y):
+                                    self.move(move)
+                                    self.log_move.append(move)
+                                    
+                                    # pawn promotion
+                                    if self.selected_piece.name == "pawn" and self.selected_piece.get_y() in [0,7]:
+                                        print("promotion")
+                                        self.promotion = True
+                                        self.promote_piece = self.selected_piece
+                                        
+                                    has_move = True
+                                    
+                                    # clear selection
+                                    self.selected_piece = None
+                                    self.possible_move = []
+                                    self.turn = "black" if self.turn == "white" else "white"
+                                    
+                                    break
                         
-                        for move in self.possible_move:
-                            if move.end == (x, y):
-                                self.move(move)
-                                self.log_move.append(move)
-                                
-                                # pawn promotion
-                                if self.selected_piece.name == "pawn" and self.selected_piece.get_y() in [0,7]:
-                                    color = self.selected_piece.color
-                                    img = f"assets/{color}/queen.png"
-                                    obj = Queen(img, color, "queen", (x,y))
-                                    self.piece_list.remove(self.selected_piece)
-                                    self.piece_list.append(obj)
-                                    self.set((x,y), obj)
-
-                                has_move = True
-                                
-                                # clear selection
-                                self.selected_piece = None
-                                self.possible_move = []
-                                self.turn = "black" if self.turn == "white" else "white"
-                                
-                                break
-                    
-                    if not has_move:    
-                        # verify if click on another of my pieces
-                        if selection :
-                            if selection.color == self.turn:
-                                self.selected_piece = selection
-                                self.possible_move = self.selected_piece.get_possible_moves(self)
-                        
+                        if not has_move:    
+                            # verify if click on another of my pieces
+                            if selection :
+                                if selection.color == self.turn:
+                                    self.selected_piece = selection
+                                    self.possible_move = self.selected_piece.get_possible_moves(self)
+                            
+                                else:
+                                    self.selected_piece = None
+                                    self.possible_move = []
                             else:
                                 self.selected_piece = None
                                 self.possible_move = []
-                        else:
-                            self.selected_piece = None
-                            self.possible_move = []
+                    else:
+                        for elt in self.promote_choice:
+                            if elt[0].collidepoint(mouse_x, mouse_y):
+                                print("choice")
+                                color = self.promote_piece.color
+                                img = f"assets/{color}/{elt[1]}.png"
+                                pos = (self.promote_piece.get_position())
+
+                                match elt[1]:
+                                    case "queen":
+                                        obj = Queen(img, color, elt[1], pos)
+                                    case "bishop":
+                                        obj = Bishop(img, color, elt[1], pos)
+                                    case "knight":
+                                        obj = Knight(img, color, elt[1], pos)
+                                    case "rook":
+                                        obj = Rook(img, color, elt[1], pos)
+
+                                self.piece_list.remove(self.promote_piece)
+                                self.piece_list.append(obj)
+                                self.set(self.promote_piece.get_position(), obj)
+                                self.promotion = False
+                                self.promote_choice.clear()
                     
     def update_data(self):
         
@@ -255,6 +277,9 @@ class Chess:
         self.screen.blit(background_image,(0,0))
         
         font = pygame.font.SysFont("Arial", 20)
+        
+        if self.promotion:
+            self.display_pawn_promotion_choice(self.promote_piece)
 
         # display movement history        
         y_start = 200
@@ -455,3 +480,16 @@ class Chess:
 
         possible_moves = legal_moves
         return possible_moves
+
+    def display_pawn_promotion_choice(self, pawn:Pawn):
+        pieces = ["queen","rook","bishop","knight"]
+        x,y = pawn.get_position()
+        self.promote_choice:list[tuple[pygame.Rect,str]] = []
+        coef = 1 if pawn.color == "black" else -1
+        for i in range(len(pieces)):
+            img = pygame.image.load(f"assets/{pawn.color}/full{pieces[i]}.png")
+            rx = self.start_x + x * CASE_SIZE + img.get_width() * i
+            ry = self.start_y + y + img.get_height() * coef
+            self.screen.blit(img, (rx, ry))
+            
+            self.promote_choice.append((img.get_rect(x=rx,y=ry), pieces[i]))
