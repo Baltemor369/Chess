@@ -5,6 +5,10 @@ from Piece import *
 from Move import Move
 from function import move_to_chess
 
+background_image = pygame.image.load('assets/wood_bg.jpg')
+background_image = pygame.transform.scale(background_image, (SCREEN_W, SCREEN_H))
+
+
 class Chess:
     def __init__(self,botside:str="white") -> None:
         pygame.init()
@@ -123,12 +127,55 @@ class Chess:
                         
             self.board.append(row)
     
+    def run(self):
+        while self.app_running:
+            
+            # handle event
+            for e in pygame.event.get():
+                if e.type == pygame.QUIT:
+                    self.app_running = False
+                elif e.type == pygame.KEYDOWN:
+                    if e.key == pygame.K_RETURN:
+                        self.game()
+                    elif e.key == pygame.K_ESCAPE:
+                        self.app_running = False
+
+            # refresh_graphic
+            self.screen.fill(WHITEEGG)
+
+            font = pygame.font.SysFont('timesnewroman', 32)
+            text = font.render("Press <Return> to start a game", True, BLACK, WHITEEGG)
+            w,h = text.get_size()
+
+            x,y = (SCREEN_W - w)//2, (SCREEN_H - h)//2
+            self.screen.blit(text,(x,y))
+
+            pygame.display.flip()
+        
+        pygame.quit()
+    
+    def game(self):
+        self.init_var(self.botside)
+        self.init_pieces()
+
+        while self.game_running:
+            self.handle_event()
+
+            self.update_data()
+            
+            self.draw_board()
+            
+            pygame.display.flip()
+
+            self.clock.tick(25)
+
     def handle_event(self):
         for evt in pygame.event.get():
             
             if evt.type == pygame.QUIT:
                 self.game_running = False
-            
+                self.app_running = False
+
             elif evt.type == pygame.KEYDOWN:
                 if evt.key == pygame.K_ESCAPE:
                         self.game_running = False
@@ -160,11 +207,23 @@ class Chess:
                             if move.end == (x, y):
                                 self.move(move)
                                 self.log_move.append(move)
+                                
+                                # pawn promotion
+                                if self.selected_piece.name == "pawn" and self.selected_piece.get_y() in [0,7]:
+                                    color = self.selected_piece.color
+                                    img = f"assets/{color}/queen.png"
+                                    obj = Queen(img, color, "queen", (x,y))
+                                    self.piece_list.remove(self.selected_piece)
+                                    self.piece_list.append(obj)
+                                    self.set((x,y), obj)
+
                                 has_move = True
+                                
                                 # clear selection
                                 self.selected_piece = None
                                 self.possible_move = []
                                 self.turn = "black" if self.turn == "white" else "white"
+                                
                                 break
                     
                     if not has_move:    
@@ -189,79 +248,38 @@ class Chess:
 
         elif self.selected_piece:
             self.possible_move = self.filter_move(self.selected_piece)
-
         
-
-    def run(self):
-        while self.app_running:
-            
-            # handle event
-            for e in pygame.event.get():
-                if e.type == pygame.QUIT:
-                    self.app_running = False
-                elif e.type == pygame.KEYDOWN:
-                    if e.key == pygame.K_RETURN:
-                        self.game()
-                    elif e.key == pygame.K_ESCAPE:
-                        self.app_running = False
-
-            # refresh_graphic
-            self.screen.fill(WHITE)
-
-            font = pygame.font.SysFont('timesnewroman', 32)
-            text = font.render("Press <Return> to start a game", True, BLACK, WHITE)
-            w,h = text.get_size()
-
-            x,y = (SCREEN_W - w)//2, (SCREEN_H - h)//2
-            self.screen.blit(text,(x,y))
-
-            pygame.display.flip()
-        
-        pygame.quit()
-    
-    def game(self):
-        self.init_var(self.botside)
-        self.init_pieces()
-
-        while self.game_running:
-            self.handle_event()
-
-            self.update_data()
-            
-            self.draw_board()
-            
-            pygame.display.flip()
-
-            self.clock.tick(25)
 
     def draw_board(self):
-        self.screen.fill(WHITE)
+        self.screen.fill(WOOD)
+        self.screen.blit(background_image,(0,0))
         
         font = pygame.font.SysFont("Arial", 20)
 
+        # display movement history        
         y_start = 200
-
         log_start = (len(self.log_move)-MAX_LOG) if len(self.log_move) >MAX_LOG else 0
         log_start = log_start - (log_start % 2)
-
-
         move_text = ""
         for i in range(log_start,len(self.log_move)):
             if (i+1) % 2 == 0:
                 move_text += move_to_chess(self.log_move[i])
-                text = font.render(move_text, True, BLACK)
+                text = font.render(move_text, True, WHITE)
                 self.screen.blit(text, (650,y_start))
                 move_text = ""
                 y_start += 22
             else:
                 move_text += move_to_chess(self.log_move[i]) + ' . '
-                text = font.render(move_text, True, BLACK)
+                text = font.render(move_text, True, WHITE)
                 self.screen.blit(text, (650,y_start))
+
 
         moves = [move.end for move in self.possible_move]
         for row in range(8):
             for col in range(8):
-                bg_color = WHITE if (row + col) % 2 == 0 else GRAYLIGHT
+                bg_color = WHITEEGG if (row + col) % 2 == 0 else GREENLIGHT
+                move_color = BLUELIGHT if (row + col) % 2 == 0 else BLUEDARK
+                selected_color = YELLOWLIGHT if (row + col) % 2 == 0 else YELLOWDARK
                 case_rect = pygame.Rect(
                     self.start_x + CASE_SIZE * row,
                     self.start_y + CASE_SIZE * col,
@@ -271,14 +289,14 @@ class Chess:
 
                 # highlight the selected piece
                 if self.selected_piece and (row,col) == self.selected_piece.get_position():
-                    pygame.draw.rect(self.screen, GREENLIGHT, case_rect)
+                    pygame.draw.rect(self.screen, selected_color, case_rect)
                 # highlight possible moves
                 elif (row,col) in moves:
-                    pygame.draw.rect(self.screen, BLUELIGHT, case_rect)
+                    pygame.draw.rect(self.screen, move_color, case_rect)
                 # highlight the king who is in check
                 elif self.is_in_check(self.turn) and self.get_piece_at((row,col)) == self.get_king(self.turn):
                     pygame.draw.rect(self.screen, REDLIGHT, case_rect)
-                # classic draw
+                # classic case draw
                 else:
                     pygame.draw.rect(self.screen, bg_color, case_rect)
 
@@ -385,7 +403,6 @@ class Chess:
         return False
     
     def move(self, move:Move):
-        # actualize the position in the piece class
         move.target_piece.move(move.end)
         self.set(move.start,None)
         self.set(move.end, move.target_piece)
@@ -402,21 +419,15 @@ class Chess:
             self.set(move.second_end, move.second_target)
 
     def unmove(self, move:Move):
-        # get back the main piece
-        # refresh the position for the piece
         move.target_piece.set_position(move.start)
         move.target_piece.step -= 1
-        # clear the end position
         self.set(move.end,None)
-        # refresh the begin position of the piece
         self.set(move.start,move.target_piece)
 
-        # get back the eating piece if there is one
         if move.eat_piece:
             self.piece_list.append(move.eat_piece)
             self.set(move.eat_piece.get_position(), move.eat_piece)
         
-        # go back the second target if there is one
         elif move.second_target:
             move.second_target.set_position(move.second_start)
             move.second_target.step -= 1
@@ -424,15 +435,11 @@ class Chess:
             self.set(move.second_start, move.second_target)
     
     def filter_move(self, piece:Piece):
-        # remove all move out of the board
-        # and illegal move that get your own king in check
-
-        # get the possible move of selected piece 
         possible_moves = piece.get_possible_moves(self)
         
         legal_moves = []
         for move in possible_moves:
-            # if move in the board
+            # if the move is in the board
             if  0 <= move.end[0] < 8 and 0 <= move.end[1] < 8:
                 # do the move
                 self.move(move)
@@ -440,10 +447,10 @@ class Chess:
                 # if the move doesn't get the player in check
                 if self.is_in_check(self.turn) == False:
 
-                    # it's a legal move so add it
+                    # So it's a legal move and add it
                     legal_moves.append(move)
 
-                # undo the move
+                # cancel the move
                 self.unmove(move)
 
         possible_moves = legal_moves
