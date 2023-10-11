@@ -10,24 +10,27 @@ background_image = pygame.transform.scale(background_image, (SCREEN_W, SCREEN_H)
 
 
 class Chess:
-    def __init__(self,botside:str="white") -> None:
-        pygame.init()
-        pygame.font.init()
-        
+    def __init__(self) -> None:
+        self.init()
         self.screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
         pygame.display.set_caption("Chess")
+        ico = pygame.image.load("assets/chess_icon.ico")
+        pygame.display.set_icon(ico)
 
         self.clock = pygame.time.Clock()
-        self.botside = botside
+        
         self.app_running:bool = True
 
         self.start_x = (SCREEN_W - (CASE_SIZE * 8)) // 2
         self.start_y = (SCREEN_H - (CASE_SIZE * 8)) // 2
+    
+    def init(self):
+        pygame.init()
+        pygame.font.init()
 
-    def init_var(self, botside:str):
+    def init_var(self):
         self.game_running = True
         self.promotion = False
-        self.botside:str = "white" if botside=="white" else "black"
         self.turn:str = "white"
         self.checkmate:str = None
         self.selected_piece:Piece|None = None
@@ -132,31 +135,51 @@ class Chess:
         while self.app_running:
             
             # handle event
-            for e in pygame.event.get():
-                if e.type == pygame.QUIT:
-                    self.app_running = False
-                elif e.type == pygame.KEYDOWN:
-                    if e.key == pygame.K_RETURN:
-                        self.game()
-                    elif e.key == pygame.K_ESCAPE:
-                        self.app_running = False
+            self.menu_handle_event()
 
             # refresh_graphic
-            self.screen.fill(WHITEEGG)
-
-            font = pygame.font.SysFont('timesnewroman', 32)
-            text = font.render("Press <Return> to start a game", True, BLACK, WHITEEGG)
-            w,h = text.get_size()
-
-            x,y = (SCREEN_W - w)//2, (SCREEN_H - h)//2
-            self.screen.blit(text,(x,y))
-
-            pygame.display.flip()
+            self.menu_refresh_graphic()
         
         pygame.quit()
     
+    def menu_handle_event(self):
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                self.app_running = False
+            elif e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_RETURN:
+                    self.game()
+                elif e.key == pygame.K_ESCAPE:
+                    self.app_running = False
+            elif e.type == pygame.MOUSEBUTTONDOWN:
+                if e.button == 1:
+                    mouse_x, mouse_y = pygame.mouse.get_pos()
+                    if self.white_B.collidepoint(mouse_x, mouse_y):
+                        self.botside = "white"
+                        self.game()
+                    elif self.black_B.collidepoint(mouse_x, mouse_y):
+                        self.botside = "black"
+                        self.game()
+    
+    def menu_refresh_graphic(self):
+        self.screen.fill((0,0,0))
+        self.screen.blit(background_image,(0,0))
+
+        width = 150
+        height = 100
+        x = (SCREEN_W - width) // 2
+        y = (SCREEN_H - height) // 2 - height - 10
+        self.white_B = self.draw_button(x, y, width, height, "White", bg=WHITE, fg=BLACK, font_size=50)
+        width = 150
+        height = 100
+        x = (SCREEN_W - width) // 2
+        y = (SCREEN_H - height) // 2 + 10
+        self.black_B = self.draw_button(x, y, width, height, "Black", bg=BLACK, fg=WHITE, font_size=50)
+        
+        pygame.display.flip()
+    
     def game(self):
-        self.init_var(self.botside)
+        self.init_var()
         self.init_pieces()
 
         while self.game_running:
@@ -182,9 +205,9 @@ class Chess:
                         self.game_running = False
                 elif evt.key == pygame.K_RETURN:
                         if self.checkmate:
-                            self.init_var(self.botside)
+                            self.init_var()
                             self.init_pieces()
-                elif not self.promotion and evt.key == pygame.K_SPACE and len(self.log_move)>0:
+                elif not self.promotion and not self.checkmate and evt.key == pygame.K_SPACE and len(self.log_move)>0:
                     self.unmove(self.log_move[-1])
                     self.log_move.pop()
                     self.turn = "black" if self.turn == "white" else "white"
@@ -212,7 +235,6 @@ class Chess:
                                     
                                     # pawn promotion
                                     if self.selected_piece.name == "pawn" and self.selected_piece.get_y() in [0,7]:
-                                        print("promotion")
                                         self.promotion = True
                                         self.promote_piece = self.selected_piece
                                         
@@ -241,7 +263,6 @@ class Chess:
                     else:
                         for elt in self.promote_choice:
                             if elt[0].collidepoint(mouse_x, mouse_y):
-                                print("choice")
                                 color = self.promote_piece.color
                                 img = f"assets/{color}/{elt[1]}.png"
                                 pos = (self.promote_piece.get_position())
@@ -276,7 +297,7 @@ class Chess:
         self.screen.fill(WOOD)
         self.screen.blit(background_image,(0,0))
         
-        font = pygame.font.SysFont("Arial", 20)
+        font = pygame.font.SysFont("Arial", 25)
         
         if self.promotion:
             self.display_pawn_promotion_choice(self.promote_piece)
@@ -334,11 +355,11 @@ class Chess:
         
         if self.checkmate:
             text1 = font.render(f"{self.checkmate} Player won !", True, BLACK, WHITE)
-            text2 = font.render("Press <Return> to start a new game", True, BLACK, WHITE)
+            text2 = font.render("Press \"Enter\" to start a new game", True, BLACK, WHITE)
             w1 = text1.get_width()
             w2 = text2.get_width()
-            x1,y1 = (SCREEN_W - w1)//2, 25
-            x2,y2 = (SCREEN_W - w2)//2, 50
+            x1,y1 = (SCREEN_W - w1)//2, 30
+            x2,y2 = (SCREEN_W - w2)//2, 70
             self.screen.blit(text1, (x1,y1))
             self.screen.blit(text2, (x2,y2))
 
@@ -493,3 +514,15 @@ class Chess:
             self.screen.blit(img, (rx, ry))
             
             self.promote_choice.append((img.get_rect(x=rx,y=ry), pieces[i]))
+    
+    def draw_button(self, x:int, y:int, width:int, height:int, text:str, bg:tuple=WHITEEGG, fg:tuple=BLACK, font_size:int=15):
+        r = pygame.draw.rect(self.screen, bg, (x, y, width, height))
+
+        button_font = pygame.font.Font(None, font_size)
+        text_surface = button_font.render(text, True, fg)
+        text_rect = text_surface.get_rect()
+        text_rect.center = (x + width // 2, y + height // 2)
+
+        self.screen.blit(text_surface, text_rect)
+
+        return r
